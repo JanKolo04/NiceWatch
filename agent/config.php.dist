@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'server_url' => 'https://nicewatch.example.com',
+    'api_token' => 'paste-bearer-token-here',
+
+    'hostname' => null,
+
+    'timeout_seconds' => 10,
+    'verify_tls' => true,
+
+    'collectors' => [
+        'system' => true,
+    ],
+];

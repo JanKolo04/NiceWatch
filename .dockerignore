@@ -1,0 +1,42 @@
+# Root-level .dockerignore — applied for both app and web image builds
+# (both use the repo root as context to share an identical Vite build).
+
+# --- Server build artifacts / local state ---
+server/vendor/
+server/node_modules/
+server/storage/app/private/
+server/storage/framework/cache/
+server/storage/framework/sessions/
+server/storage/framework/views/
+server/storage/logs/
+server/bootstrap/cache/*.php
+server/database/*.sqlite
+server/database/*.sqlite-journal
+
+# --- Agent local state ---
+agent/vendor/
+agent/composer.lock
+agent/config.php
+
+# --- Env / secrets ---
+.env
+.env.backup
+.env.local
+.env.production
+server/.env
+server/.env.backup
+server/.env.local
+server/.env.production
+
+# --- Tooling / VCS / OS ---
+.git/
+.github/
+.idea/
+.vscode/
+*.log
+.DS_Store
+server/.phpunit.result.cache
+server/.phpunit.cache/
+
+# --- Memory + claude config (not for shipping) ---
+.claude/

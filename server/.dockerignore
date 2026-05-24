@@ -1,0 +1,33 @@
+# Don't ship build artifacts or local state into the image
+vendor/
+node_modules/
+storage/app/private/
+storage/framework/cache/
+storage/framework/sessions/
+storage/framework/views/
+storage/logs/
+bootstrap/cache/*.php
+database/*.sqlite
+database/*.sqlite-journal
+
+# Local env + secrets
+.env
+.env.backup
+.env.local
+.env.production
+
+# Tooling / VCS / OS
+.git/
+.github/
+.idea/
+.vscode/
+*.log
+.DS_Store
+.phpunit.result.cache
+.phpunit.cache/
+coverage/
+
+# Tests aren't needed at runtime in a production image, but keep them so
+# `docker compose run --rm app php artisan test` still works during dev.
+# (Uncomment the next line to strip tests from images you ship to prod.)
+# tests/

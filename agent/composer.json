@@ -1,0 +1,25 @@
+{
+    "name": "nicewatch/agent",
+    "description": "NiceWatch monitoring agent — collects host metrics and reports to the NiceWatch server.",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "ext-json": "*",
+        "guzzlehttp/guzzle": "^7.9",
+        "symfony/console": "^7.1",
+        "symfony/process": "^7.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "NiceWatch\\Agent\\": "src/"
+        }
+    },
+    "bin": [
+        "bin/nicewatch-agent"
+    ],
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true
+    }
+}

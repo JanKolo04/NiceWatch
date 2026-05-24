@@ -1,0 +1,11 @@
+[Unit]
+Description=NiceWatch agent — single checkin
+After=network.target
+
+[Service]
+Type=oneshot
+User=nicewatch
+ExecStart=/usr/bin/php /opt/nicewatch-agent/bin/nicewatch-agent run --config=/etc/nicewatch/agent.php
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

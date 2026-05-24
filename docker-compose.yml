@@ -1,0 +1,113 @@
+name: nicewatch
+
+# Shared environment block reused by app, queue and scheduler.
+# All operational settings (SMTP, alert recipient, thresholds) are managed
+# through the admin panel and stored in the database — see /settings after login.
+x-app-env: &app_env
+  APP_NAME: NiceWatch
+  APP_ENV: ${APP_ENV:-local}
+  APP_DEBUG: ${APP_DEBUG:-false}
+  APP_KEY: ${APP_KEY:?Set APP_KEY in .env — run `docker compose run --rm --no-deps app php artisan key:generate --show`}
+  APP_URL: ${APP_URL:-http://localhost:8080}
+  LOG_CHANNEL: stack
+  LOG_STACK: single
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  DB_CONNECTION: sqlite
+  DB_DATABASE: /var/lib/nicewatch/database.sqlite
+  SESSION_DRIVER: database
+  CACHE_STORE: database
+  QUEUE_CONNECTION: database
+  # Mailer driver is fixed to SMTP; credentials come from DB at runtime.
+  MAIL_MAILER: smtp
+  # Initial admin account, created by the seeder on first `docker compose up`.
+  # Idempotent: re-runs leave an existing user alone. Set EMAIL to empty to skip.
+  NICEWATCH_ADMIN_EMAIL: ${NICEWATCH_ADMIN_EMAIL:-admin@nicewatch.local}
+  NICEWATCH_ADMIN_PASSWORD: ${NICEWATCH_ADMIN_PASSWORD:-admin}
+  NICEWATCH_ADMIN_NAME: ${NICEWATCH_ADMIN_NAME:-Admin}
+
+services:
+  app:
+    build:
+      # Root context (same as web) so both images share an identical Vite build stage
+      # and produce the same /build/assets/app-XXXX.css hash.
+      context: .
+      dockerfile: server/docker/Dockerfile
+    image: nicewatch/server:latest
+    restart: unless-stopped
+    environment:
+      <<: *app_env
+    volumes:
+      - app-data:/var/lib/nicewatch
+      - app-storage:/var/www/html/storage
+    networks:
+      - nicewatch
+
+  web:
+    build:
+      # Root context so the build can see both ./server and ./agent (for the agent download ZIP).
+      context: .
+      dockerfile: server/docker/nginx.Dockerfile
+    image: nicewatch/web:latest
+    restart: unless-stopped
+    ports:
+      - "${NICEWATCH_HTTP_PORT:-8080}:80"
+    volumes:
+      # Storage is read-only here so Laravel can stream uploads/avatars/etc.
+      # public/ and public/build/ come from the image (built with the app).
+      - app-storage:/var/www/html/storage:ro
+    networks:
+      - nicewatch
+    depends_on:
+      - app
+
+  queue:
+    image: nicewatch/server:latest
+    restart: unless-stopped
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--max-time=3600", "--no-interaction"]
+    environment:
+      <<: *app_env
+      NICEWATCH_RUN_MIGRATIONS: "false"
+      NICEWATCH_CACHE_CONFIG: "false"
+    volumes:
+      - app-data:/var/lib/nicewatch
+      - app-storage:/var/www/html/storage
+    networks:
+      - nicewatch
+    depends_on:
+      - app
+
+  scheduler:
+    image: nicewatch/server:latest
+    restart: unless-stopped
+    command: ["php", "artisan", "schedule:work", "--no-interaction"]
+    environment:
+      <<: *app_env
+      NICEWATCH_RUN_MIGRATIONS: "false"
+      NICEWATCH_CACHE_CONFIG: "false"
+    volumes:
+      - app-data:/var/lib/nicewatch
+      - app-storage:/var/www/html/storage
+    networks:
+      - nicewatch
+    depends_on:
+      - app
+
+  # Optional dev mail catcher: `docker compose --profile dev up -d`
+  # Then in panel /settings set: host=mailpit, port=1025, encryption=Bez (none),
+  # username/password puste, from = dowolny.
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    profiles: ["dev"]
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    networks:
+      - nicewatch
+
+volumes:
+  app-data:
+  app-storage:
+
+networks:
+  nicewatch:
+    driver: bridge
