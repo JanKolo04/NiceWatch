@@ -21,7 +21,10 @@ class AuthenticateAgent
             return response()->json(['message' => 'Missing bearer token'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $host = Host::query()->where('api_token', $token)->first();
+        // Lookup by SHA-256 hash — token is never stored in plaintext.
+        // hash() output is fixed-length so the equality check is constant-time
+        // at the SQL layer, sidestepping naive timing oracles.
+        $host = Host::query()->where('api_token_hash', Host::hashToken($token))->first();
 
         if ($host === null) {
             return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);

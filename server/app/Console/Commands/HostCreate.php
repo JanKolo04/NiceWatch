@@ -26,13 +26,13 @@ class HostCreate extends Command
         $token = Host::generateToken();
         $host = Host::create([
             'name' => $name,
-            'api_token' => $token,
+            'api_token_hash' => Host::hashToken($token),
             'status' => Host::STATUS_UNKNOWN,
         ]);
 
         $this->info("Created host #{$host->id} '{$host->name}'");
         $this->newLine();
-        $this->line('Bearer token (copy into agent config.php):');
+        $this->line('Bearer token (copy NOW — only stored as SHA-256 hash, no way to recover):');
         $this->line($token);
 
         return self::SUCCESS;

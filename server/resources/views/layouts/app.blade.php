@@ -42,6 +42,24 @@
                     <span class="w-9"></span>
                 </div>
 
+                @php
+                    $scheme = parse_url((string) config('app.url'), PHP_URL_SCHEME);
+                    $env = app()->environment();
+                    $insecureProd = $scheme !== 'https' && ! in_array($env, ['local', 'testing'], true);
+                @endphp
+                @if($insecureProd)
+                    <div class="bg-red-600 text-white text-sm">
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-2">
+                            <x-icon name="alert" class="w-4 h-4 shrink-0" />
+                            <span>
+                                <strong>Panel działa przez HTTP.</strong>
+                                Bearer tokeny agentów lecą po sieci w cleartext. Wystaw NiceWatch za HTTPS reverse proxy (Caddy/Traefik/nginx),
+                                ustaw <code class="font-mono text-xs">APP_URL=https://…</code> i <code class="font-mono text-xs">SESSION_SECURE_COOKIE=true</code> w <code class="font-mono text-xs">.env</code>.
+                            </span>
+                        </div>
+                    </div>
+                @endif
+
                 @isset($header)
                     <header class="border-b border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40 backdrop-blur">
                         <div class="max-w-7xl mx-auto py-5 px-4 sm:px-6 lg:px-8">

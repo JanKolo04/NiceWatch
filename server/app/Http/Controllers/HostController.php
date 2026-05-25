@@ -62,7 +62,7 @@ class HostController extends Controller
         $token = Host::generateToken();
         $host = Host::create([
             'name' => $data['name'],
-            'api_token' => $token,
+            'api_token_hash' => Host::hashToken($token),
             'status' => Host::STATUS_UNKNOWN,
         ]);
 
@@ -81,6 +81,17 @@ class HostController extends Controller
             'snapshot' => $snapshot,
             'recentAlerts' => $recentAlerts,
         ]);
+    }
+
+    public function rotateToken(Host $host): RedirectResponse
+    {
+        $token = Host::generateToken();
+        $host->update(['api_token_hash' => Host::hashToken($token)]);
+
+        return redirect()
+            ->route('hosts.show', $host)
+            ->with('agent_token', $token)
+            ->with('status', "Token rotated. Re-install the agent on {$host->name} or update /etc/nicewatch/agent.php.");
     }
 
     public function destroy(Host $host): RedirectResponse

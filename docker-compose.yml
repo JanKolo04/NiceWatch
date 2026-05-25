@@ -19,10 +19,14 @@ x-app-env: &app_env
   QUEUE_CONNECTION: database
   # Mailer driver is fixed to SMTP; credentials come from DB at runtime.
   MAIL_MAILER: smtp
-  # Initial admin account, created by the seeder on first `docker compose up`.
-  # Idempotent: re-runs leave an existing user alone. Set EMAIL to empty to skip.
+  # Forces Secure flag on session cookies when serving over HTTPS.
+  SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE-}
+  # Initial admin account, seeded on first `docker compose up`.
+  # If NICEWATCH_ADMIN_PASSWORD is empty (or 'CHANGE_ME'), the seeder generates
+  # a random password and prints it to `docker compose logs app` once.
+  # Set EMAIL to empty to skip auto-seeding entirely.
   NICEWATCH_ADMIN_EMAIL: ${NICEWATCH_ADMIN_EMAIL:-admin@nicewatch.local}
-  NICEWATCH_ADMIN_PASSWORD: ${NICEWATCH_ADMIN_PASSWORD:-admin}
+  NICEWATCH_ADMIN_PASSWORD: ${NICEWATCH_ADMIN_PASSWORD-}
   NICEWATCH_ADMIN_NAME: ${NICEWATCH_ADMIN_NAME:-Admin}
 
 services:
@@ -100,7 +104,8 @@ services:
     restart: unless-stopped
     profiles: ["dev"]
     ports:
-      - "${MAILPIT_UI_PORT:-8025}:8025"
+      # Bind to localhost only — dev tool, never expose publicly.
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
     networks:
       - nicewatch
 

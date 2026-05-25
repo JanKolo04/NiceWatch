@@ -14,6 +14,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
     Route::resource('hosts', HostController::class)
         ->only(['index', 'create', 'store', 'show', 'destroy']);
+    Route::post('/hosts/{host}/rotate-token', [HostController::class, 'rotateToken'])->name('hosts.rotate-token');
 
     Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');

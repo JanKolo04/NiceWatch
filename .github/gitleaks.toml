@@ -1,0 +1,22 @@
+# gitleaks config for NiceWatch — extends defaults with project-specific allowlist.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known test/example/placeholder values"
+paths = [
+    '''server/tests/.*''',
+    '''docs/.*\.md''',
+    '''SECURITY\.md''',
+    '''README\.md''',
+    '''\.env\.example''',
+    '''agent/config\.php\.dist''',
+]
+regexes = [
+    '''placeholder[-_]token''',
+    '''fake[-_]token''',
+    '''<BEARER_TOKEN>''',
+    '''<TWOJ_BEARER_TOKEN>''',
+    '''CHANGE_ME''',
+    '''base64:bn31fACn1/CX\+n\+6e274''',   # dev-only APP_KEY committed in earlier examples
+]

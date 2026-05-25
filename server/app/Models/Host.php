@@ -23,24 +23,31 @@ class Host extends Model
     protected $fillable = [
         'name',
         'hostname',
-        'api_token',
+        'api_token_hash',
         'status',
         'last_seen_at',
     ];
 
-    // api_token is visible to authenticated panel users on purpose:
-    // they need to copy it into the agent installer one-liner. Anyone with
-    // access to the panel can already enumerate hosts and rotate tokens, so
-    // hiding it would only add friction (no security benefit). Don't expose
-    // it through public JSON responses — keep usage to authenticated views.
+    // Only the SHA-256 hash of the bearer token is persisted; the plaintext
+    // value is shown to the operator exactly once (via session flash after
+    // create/rotate) and never again. Token comparison happens against the hash.
 
     protected $casts = [
         'last_seen_at' => 'datetime',
     ];
 
+    /**
+     * Generate a fresh bearer token and return the plaintext.
+     * Caller is responsible for surfacing it to the operator once.
+     */
     public static function generateToken(): string
     {
         return Str::random(64);
+    }
+
+    public static function hashToken(string $token): string
+    {
+        return hash('sha256', $token);
     }
 
     public function snapshots(): HasMany

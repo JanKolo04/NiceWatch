@@ -16,9 +16,11 @@ if [ "${DB_CONNECTION:-sqlite}" = "sqlite" ]; then
     if [ ! -f "$DB_FILE" ]; then
         echo "[entrypoint] Creating SQLite database at $DB_FILE"
         mkdir -p "$(dirname "$DB_FILE")"
+        chmod 750 "$(dirname "$DB_FILE")"
         touch "$DB_FILE"
         chown www-data:www-data "$DB_FILE"
-        chmod 664 "$DB_FILE"
+        # 600: nobody but the running php user (and root) should read tokens/hashes/secrets
+        chmod 600 "$DB_FILE"
     fi
 fi
 
@@ -42,5 +44,17 @@ if [ "${NICEWATCH_CACHE_CONFIG:-true}" = "true" ]; then
     php artisan view:cache --no-ansi
 fi
 
-# Hand off to whatever CMD the container was started with (php-fpm, queue:work, schedule:work, ...)
-exec "$@"
+# Hand off to whatever CMD the container was started with.
+# PHP-FPM is special: its master process must stay root to fork worker processes
+# under www-data (pool config in /usr/local/etc/php-fpm.d/www.conf handles the
+# privilege drop for workers — application code never runs as root).
+# For artisan commands (queue:work, schedule:work, tinker), drop to www-data
+# explicitly so the PHP process itself runs unprivileged.
+case "$1" in
+    php-fpm|php-fpm,*)
+        exec "$@"
+        ;;
+    *)
+        exec su-exec www-data "$@"
+        ;;
+esac

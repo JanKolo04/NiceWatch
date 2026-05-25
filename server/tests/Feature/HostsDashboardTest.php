@@ -27,7 +27,7 @@ class HostsDashboardTest extends TestCase
         $host = Host::create([
             'name' => 'web01',
             'hostname' => 'web01.example.com',
-            'api_token' => Host::generateToken(),
+            'api_token_hash' => Host::hashToken(Host::generateToken()),
             'status' => Host::STATUS_ONLINE,
             'last_seen_at' => now(),
         ]);
@@ -53,7 +53,7 @@ class HostsDashboardTest extends TestCase
         $user = User::factory()->create();
         $host = Host::create([
             'name' => 'web01',
-            'api_token' => Host::generateToken(),
+            'api_token_hash' => Host::hashToken(Host::generateToken()),
             'status' => Host::STATUS_ONLINE,
             'last_seen_at' => now(),
         ]);
@@ -97,9 +97,30 @@ class HostsDashboardTest extends TestCase
             ->assertRedirect(route('hosts.show', $host))
             ->assertSessionHas('agent_token');
 
+        // Token plaintext is in the redirect session flash; follow the flow.
         $this->actingAs($user)
-            ->withSession(['agent_token' => $host->getAttributes()['api_token']])
+            ->withSession(['agent_token' => 'fake-token-for-display'])
             ->get(route('hosts.show', $host))
             ->assertSee('Bearer token');
+    }
+
+    public function test_rotate_token_replaces_hash_and_flashes_new_plaintext(): void
+    {
+        $user = User::factory()->create();
+        $oldToken = Host::generateToken();
+        $host = Host::create([
+            'name' => 'web01',
+            'api_token_hash' => Host::hashToken($oldToken),
+            'status' => Host::STATUS_ONLINE,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->post(route('hosts.rotate-token', $host));
+
+        $response->assertRedirect(route('hosts.show', $host));
+        $newToken = session('agent_token');
+        $this->assertIsString($newToken);
+        $this->assertNotSame($oldToken, $newToken);
+        $this->assertSame(Host::hashToken($newToken), $host->fresh()->api_token_hash);
     }
 }

@@ -40,6 +40,7 @@ FROM php:8.4-fpm-alpine AS runtime
 # System deps required by Laravel + sqlite + intl + zip
 RUN apk add --no-cache \
         bash \
+        su-exec \
         sqlite \
         sqlite-libs \
         icu-libs \
@@ -103,7 +104,8 @@ RUN set -eux; \
         bootstrap/cache \
         /var/lib/nicewatch; \
     chown -R www-data:www-data storage bootstrap/cache /var/lib/nicewatch; \
-    chmod -R 775 storage bootstrap/cache /var/lib/nicewatch
+    chmod -R 770 storage bootstrap/cache; \
+    chmod 750 /var/lib/nicewatch
 
 COPY server/docker/entrypoint.sh /usr/local/bin/nicewatch-entrypoint
 RUN chmod +x /usr/local/bin/nicewatch-entrypoint

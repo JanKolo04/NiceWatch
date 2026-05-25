@@ -41,10 +41,8 @@
         </button>
     </form>
 
-    @if(app()->environment('local'))
-        <div class="mt-6 p-3 rounded-lg bg-slate-800/60 border border-slate-700 text-xs text-slate-400">
-            <strong class="text-slate-300">Domyślne konto:</strong>
-            <code class="block mt-1 font-mono text-slate-200">admin@nicewatch.local / admin</code>
-        </div>
-    @endif
+    <p class="mt-6 text-xs text-slate-500 text-center">
+        Brak konta? Operator może je utworzyć:
+        <code class="font-mono text-slate-400">php artisan nicewatch:user:create</code>
+    </p>
 </x-guest-layout>

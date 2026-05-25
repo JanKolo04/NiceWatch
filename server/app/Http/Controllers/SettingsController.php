@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
 
@@ -66,7 +67,12 @@ class SettingsController extends Controller
         try {
             Mail::to($recipient)->send(new SmtpTestMail());
         } catch (Throwable $e) {
-            return back()->with('error', 'Błąd SMTP: ' . $e->getMessage());
+            // Don't surface raw exception text to the user — it can leak service
+            // banners (SSH/Redis/etc.) when the host was abused as an SSRF probe.
+            // Log full details for the operator.
+            Log::warning('SMTP test failed', ['exception' => $e]);
+
+            return back()->with('error', 'Nie udało się wysłać testowego maila — sprawdź `docker compose logs queue` lub plik storage/logs/laravel.log po szczegóły.');
         }
 
         return back()->with('status', "Wysłano test maila na {$recipient}.");

@@ -28,11 +28,14 @@
     $totalRx = collect($network)->sum('rx_bytes');
     $totalTx = collect($network)->sum('tx_bytes');
 
-    $token = $host->getAttributes()['api_token'];
+    // Plaintext token only exists immediately after create/rotate (session flash).
+    // After that, only the SHA-256 hash is stored — operator must rotate to get a new token.
+    $token = session('agent_token');
     $serverUrl = rtrim(config('app.url'), '/');
     $needsAgentSetup = $host->last_seen_at === null;
+    $tokenPlaceholder = $token ?: '<ROTATE_TO_GET_NEW_TOKEN>';
 
-    $oneliner = "curl -fsSL {$serverUrl}/install.sh | sudo bash -s -- \\\n    --server {$serverUrl} \\\n    --token {$token} \\\n    --name {$host->name}";
+    $oneliner = "curl -fsSL {$serverUrl}/install.sh | sudo bash -s -- \\\n    --server {$serverUrl} \\\n    --token {$tokenPlaceholder} \\\n    --name {$host->name}";
 @endphp
 <x-app-layout>
     <x-slot name="header">
@@ -68,40 +71,31 @@
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
-        {{-- Bearer token --}}
-        <div class="nw-card p-5" x-data="{ visible: false }">
-            <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-2">
-                        <x-icon name="sparkles" class="w-5 h-5 text-brand-500" />
-                        <h2 class="font-semibold text-slate-900 dark:text-slate-100">Bearer token</h2>
+        {{-- Bearer token — shown only right after create/rotate --}}
+        @if($token)
+            <div class="nw-card p-5 border-l-4 border-l-amber-500" x-data="{ copied: false }">
+                <div class="flex items-start gap-3">
+                    <x-icon name="sparkles" class="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-slate-900 dark:text-slate-100">Bearer token — zapisz teraz</p>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                            Token jest pokazany <strong>tylko raz</strong>. Dalej zapisany jest jako SHA-256, więc nie da się go odzyskać — można go zrotować na nowy.
+                        </p>
+                        <div class="mt-3 relative">
+                            <input type="text" readonly value="{{ $token }}"
+                                   class="block w-full pr-24 rounded-lg border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-mono text-sm focus:border-brand-500 focus:ring-brand-500 select-all" />
+                            <button type="button"
+                                    @click="navigator.clipboard.writeText('{{ $token }}').then(() => { copied = true; setTimeout(() => copied = false, 1500) })"
+                                    class="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-md text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
+                                    :class="copied && 'bg-emerald-600 hover:bg-emerald-600'">
+                                <span x-show="!copied">Skopiuj</span>
+                                <span x-show="copied" style="display:none;">Skopiowano</span>
+                            </button>
+                        </div>
                     </div>
-                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        Token identyfikuje tego hosta wobec centrali. Możesz go skopiować w dowolnym momencie.
-                    </p>
-                </div>
-                <button type="button" @click="visible = !visible"
-                        class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 shrink-0">
-                    <span x-show="!visible">Pokaż</span>
-                    <span x-show="visible" style="display:none;">Ukryj</span>
-                </button>
-            </div>
-            <div class="mt-3" x-data="{ copied: false }">
-                <div class="relative">
-                    <input type="text" readonly
-                           value="{{ $token }}"
-                           x-bind:type="visible ? 'text' : 'password'"
-                           class="block w-full pr-24 rounded-lg border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-mono text-sm focus:border-brand-500 focus:ring-brand-500 select-all" />
-                    <button type="button"
-                            @click="navigator.clipboard.writeText('{{ $token }}').then(() => { copied = true; setTimeout(() => copied = false, 1500) })"
-                            class="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-md text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
-                            :class="copied && 'bg-emerald-600 hover:bg-emerald-600'">
-                        <span x-show="!copied">Skopiuj</span>
-                        <span x-show="copied" style="display:none;">Skopiowano</span>
-                    </button>
                 </div>
             </div>
-        </div>
+        @endif
 
         {{-- Agent setup — one liner --}}
         <div class="nw-card p-5">
@@ -115,7 +109,12 @@
                         @endif
                     </div>
                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Komenda do wykonania na monitorowanym serwerze (jako root). Token już jest w środku — wystarczy skopiować całość.
+                        Komenda do wykonania na monitorowanym serwerze (jako root).
+                        @if($token)
+                            Token jest już wstawiony.
+                        @else
+                            Token nie jest tu pokazany — wygeneruj nowy przyciskiem <em>Rotate token</em> niżej lub wklej własny w miejsce <code class="font-mono text-xs">&lt;ROTATE_TO_GET_NEW_TOKEN&gt;</code>.
+                        @endif
                     </p>
                 </div>
                 <a href="{{ route('agent.install') }}" class="text-sm text-brand-500 hover:text-brand-400 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
@@ -325,6 +324,24 @@
                     @endforeach
                 </ul>
             @endif
+        </div>
+
+        {{-- Token rotation --}}
+        <div class="nw-card p-5 flex items-center justify-between">
+            <div>
+                <h3 class="font-semibold text-slate-900 dark:text-slate-100">Rotate bearer token</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                    Wygeneruj nowy token (unieważnia poprzedni). Po rotacji musisz przeinstalować agenta lub zaktualizować <code class="font-mono text-xs">/etc/nicewatch/agent.php</code>.
+                </p>
+            </div>
+            <form method="POST" action="{{ route('hosts.rotate-token', $host) }}"
+                  onsubmit="return confirm('Stary token przestanie działać. Kontynuować?');">
+                @csrf
+                <button type="submit" class="nw-btn-secondary">
+                    <x-icon name="sparkles" class="w-4 h-4" />
+                    Rotate token
+                </button>
+            </form>
         </div>
 
         {{-- Danger zone --}}
