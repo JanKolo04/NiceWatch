@@ -65,6 +65,11 @@ services:
       - app
 
   queue:
+    # Same build as `app` so compose builds the image locally instead of trying
+    # to pull nicewatch/server from a registry. All three reuse one built image.
+    build:
+      context: .
+      dockerfile: server/docker/Dockerfile
     image: nicewatch/server:latest
     restart: unless-stopped
     command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--max-time=3600", "--no-interaction"]
@@ -81,6 +86,9 @@ services:
       - app
 
   scheduler:
+    build:
+      context: .
+      dockerfile: server/docker/Dockerfile
     image: nicewatch/server:latest
     restart: unless-stopped
     command: ["php", "artisan", "schedule:work", "--no-interaction"]

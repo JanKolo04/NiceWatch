@@ -1,0 +1,129 @@
+name: nicewatch
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Wariant deploymentu ZA TRAEFIKIEM (lub innym reverse proxy w sieci `proxy`).
+#
+# Różnice względem docker-compose.yml (port-based):
+#   - `web` NIE wystawia portu na hosta — Traefik routuje wewnętrznie przez sieć `proxy`
+#   - `web` ma labelki Traefik (Host rule, TLS Let's Encrypt) i jest w sieci `proxy`
+#   - APP_URL = https://<domena>, SESSION_SECURE_COOKIE=true (TLS terminuje Traefik)
+#   - brak Mailpit (to narzędzie dev — użyj głównego compose z `--profile dev`)
+#
+# Wymaga: działającego Traefika tworzącego sieć `proxy` (external) z entrypointem
+# `websecure` i certresolverem `le`. Patrz docs/deploy-traefik.md.
+#
+# Użycie:
+#   docker compose -f docker-compose.traefik.yml up -d --build
+# ─────────────────────────────────────────────────────────────────────────────
+
+x-app-env: &app_env
+  APP_NAME: NiceWatch
+  APP_ENV: ${APP_ENV:-production}
+  APP_DEBUG: ${APP_DEBUG:-false}
+  APP_KEY: ${APP_KEY:?Set APP_KEY in .env — run `docker compose -f docker-compose.traefik.yml run --rm --no-deps app php artisan key:generate --show`}
+  # Pełny URL z https:// — z niego panel generuje one-liner instalacji agenta ORAZ asset URLs.
+  APP_URL: ${APP_URL:?Set APP_URL=https://your-domain in .env}
+  LOG_CHANNEL: stack
+  LOG_STACK: single
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  DB_CONNECTION: sqlite
+  DB_DATABASE: /var/lib/nicewatch/database.sqlite
+  SESSION_DRIVER: database
+  CACHE_STORE: database
+  QUEUE_CONNECTION: database
+  # TLS terminuje Traefik → wymuś Secure na cookies sesji.
+  SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}
+  MAIL_MAILER: smtp
+  NICEWATCH_ADMIN_EMAIL: ${NICEWATCH_ADMIN_EMAIL:-admin@nicewatch.local}
+  NICEWATCH_ADMIN_PASSWORD: ${NICEWATCH_ADMIN_PASSWORD-}
+  NICEWATCH_ADMIN_NAME: ${NICEWATCH_ADMIN_NAME:-Admin}
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: server/docker/Dockerfile
+    image: nicewatch/server:latest
+    restart: unless-stopped
+    environment:
+      <<: *app_env
+    volumes:
+      - app-data:/var/lib/nicewatch
+      - app-storage:/var/www/html/storage
+    networks:
+      - nicewatch
+
+  web:
+    build:
+      context: .
+      dockerfile: server/docker/nginx.Dockerfile
+    image: nicewatch/web:latest
+    restart: unless-stopped
+    volumes:
+      - app-storage:/var/www/html/storage:ro
+    networks:
+      - nicewatch   # FastCGI do app:9000
+      - proxy       # widoczność dla Traefika
+    depends_on:
+      - app
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      # Nazwa routera/serwisu = nicewatch. Domena z .env (NICEWATCH_DOMAIN).
+      - "traefik.http.routers.nicewatch.rule=Host(`${NICEWATCH_DOMAIN:?Set NICEWATCH_DOMAIN in .env (np. nicewatch.example.com)}`)"
+      - "traefik.http.routers.nicewatch.entrypoints=websecure"
+      - "traefik.http.routers.nicewatch.tls.certresolver=le"
+      # nginx w obrazie web słucha na :80
+      - "traefik.http.services.nicewatch.loadbalancer.server.port=80"
+
+  queue:
+    # Same build as `app` so compose builds the image locally instead of trying
+    # to pull nicewatch/server from a registry. All three reuse one built image.
+    build:
+      context: .
+      dockerfile: server/docker/Dockerfile
+    image: nicewatch/server:latest
+    restart: unless-stopped
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--max-time=3600", "--no-interaction"]
+    environment:
+      <<: *app_env
+      NICEWATCH_RUN_MIGRATIONS: "false"
+      NICEWATCH_CACHE_CONFIG: "false"
+    volumes:
+      - app-data:/var/lib/nicewatch
+      - app-storage:/var/www/html/storage
+    networks:
+      - nicewatch
+    depends_on:
+      - app
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: server/docker/Dockerfile
+    image: nicewatch/server:latest
+    restart: unless-stopped
+    command: ["php", "artisan", "schedule:work", "--no-interaction"]
+    environment:
+      <<: *app_env
+      NICEWATCH_RUN_MIGRATIONS: "false"
+      NICEWATCH_CACHE_CONFIG: "false"
+    volumes:
+      - app-data:/var/lib/nicewatch
+      - app-storage:/var/www/html/storage
+    networks:
+      - nicewatch
+    depends_on:
+      - app
+
+networks:
+  nicewatch:
+    driver: bridge
+  proxy:
+    # Sieć tworzona przez stack Traefika — tutaj tylko z niej korzystamy.
+    name: proxy
+    external: true
+
+volumes:
+  app-data:
+  app-storage:

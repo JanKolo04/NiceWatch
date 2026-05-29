@@ -116,11 +116,22 @@ if [[ ! -d "$SRC_DIR" ]]; then SRC_DIR=$(find "$TMP_EXTRACT" -mindepth 1 -maxdep
 cp -a "$SRC_DIR/." "$INSTALL_DIR/"
 rm -rf "$TMP_ZIP" "$TMP_EXTRACT"
 
-chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
+# unzip can drop the executable bit depending on how the archive was created —
+# restore it explicitly so `bin/nicewatch-agent` can be exec'd.
+chmod +x "$INSTALL_DIR/bin/nicewatch-agent"
 
 # ---------- 4. Composer deps ----------
+# Run composer as root (simpler + avoids "no writable HOME" / traverse issues for
+# the service user during install). We chown to the service user afterwards, so
+# the agent itself still runs unprivileged via systemd.
 log "Installing composer dependencies"
-sudo -u "$SERVICE_USER" -H bash -c "cd '$INSTALL_DIR' && composer install --no-dev --no-interaction --optimize-autoloader --quiet"
+export COMPOSER_ALLOW_SUPERUSER=1
+export COMPOSER_HOME=/tmp/nicewatch-composer
+( cd "$INSTALL_DIR" && composer install --no-dev --no-interaction --optimize-autoloader --quiet )
+
+# Now hand the whole tree to the unprivileged service user (runtime owner).
+chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
+rm -rf "$COMPOSER_HOME"
 
 # ---------- 5. Config ----------
 # Generate the PHP file via `php -r var_export(...)` so values are properly

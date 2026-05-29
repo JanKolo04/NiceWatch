@@ -92,7 +92,9 @@ php artisan serve --host=127.0.0.1 --port=8000   # panel
 php artisan queue:work                            # w drugim terminalu
 php artisan schedule:work                         # w trzecim
 
-# 2) Zarejestruj się na /register, zaloguj, idź do /settings, uzupełnij SMTP.
+# 2) Utwórz konto (rejestracja publiczna jest wyłączona):
+php artisan nicewatch:user:create admin@example.com --name=Admin
+# zaloguj się, idź do /settings, uzupełnij SMTP.
 
 # 3) Agent — jak wyżej, server_url=http://127.0.0.1:8000
 ```
@@ -102,9 +104,12 @@ Panel: <http://127.0.0.1:8000/>.
 ## Dokumentacja
 
 - [`docs/architecture.md`](docs/architecture.md) — komponenty, kontrakt API, model danych
-- [`docs/deploy-docker.md`](docs/deploy-docker.md) — produkcyjny deploy centrali w Dockerze
+- [`docs/deploy-docker.md`](docs/deploy-docker.md) — deploy w Dockerze (port-based, pojedyncza apka)
+- [`docs/deploy-traefik.md`](docs/deploy-traefik.md) — deploy za Traefikiem (wiele apek pod domenami, TLS Let's Encrypt)
 - [`docs/deploy-server.md`](docs/deploy-server.md) — natywna instalacja centrali na Debian/Ubuntu
 - [`docs/deploy-agent.md`](docs/deploy-agent.md) — instalacja agenta + systemd timer
+- [`docs/coding-standards.md`](docs/coding-standards.md) · [`docs/code-review.md`](docs/code-review.md) · [`docs/ci-cd.md`](docs/ci-cd.md) · [`docs/release-process.md`](docs/release-process.md) — proces
+- [`SECURITY.md`](SECURITY.md) — model zagrożeń, reguły bezpieczeństwa, zgłaszanie luk
 
 ## Wymagania
 
