@@ -5,6 +5,7 @@
 
     $navItems = [
         ['route' => 'hosts.index',     'pattern' => 'hosts.*',    'icon' => 'server',   'label' => 'Hosts',          'badge' => $totalHosts > 0 ? $totalHosts : null],
+        ['route' => 'alerts.index',    'pattern' => 'alerts.*',   'icon' => 'bell',     'label' => 'Alerty',         'badge' => $openAlertCount > 0 ? $openAlertCount : null, 'badge_class' => 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'],
         ['route' => 'agent.install',   'pattern' => 'agent.*',    'icon' => 'sparkles', 'label' => 'Agent install',  'badge' => null],
         ['route' => 'settings.edit',   'pattern' => 'settings.*', 'icon' => 'cog',      'label' => 'Settings',       'badge' => null],
     ];
@@ -44,7 +45,7 @@
         </div>
 
         @if($openAlertCount > 0)
-            <a href="{{ route('hosts.index') }}"
+            <a href="{{ route('alerts.index') }}"
                class="flex items-center justify-between px-2 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-sm hover:bg-amber-100 dark:hover:bg-amber-900/30 transition">
                 <span class="flex items-center gap-2 text-amber-700 dark:text-amber-300">
                     <x-icon name="bell" class="w-4 h-4" />
@@ -74,7 +75,7 @@
                         class="w-5 h-5 {{ $active ? 'text-brand-500' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300' }}" />
                 <span class="flex-1">{{ $item['label'] }}</span>
                 @if($item['badge'] !== null)
-                    <span class="text-xs px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 tabular-nums">{{ $item['badge'] }}</span>
+                    <span class="text-xs px-2 py-0.5 rounded-full tabular-nums {{ $item['badge_class'] ?? 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300' }}">{{ $item['badge'] }}</span>
                 @endif
             </a>
         @endforeach

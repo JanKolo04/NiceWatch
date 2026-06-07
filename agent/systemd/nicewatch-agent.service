@@ -9,3 +9,37 @@ ExecStart=/usr/bin/php /opt/nicewatch-agent/bin/nicewatch-agent run --config=/et
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
+
+# ── Hardening ───────────────────────────────────────────────────────────────
+# Limits blast radius if the agent (or a dependency like Guzzle/curl) is ever
+# compromised. The agent only needs: read /proc, read /etc/nicewatch, run `df`,
+# and make outbound HTTPS. Everything else is locked down.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_INET AF_INET6
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @mount @swap @reboot @raw-io @debug
+# Drop every capability — the agent needs none.
+CapabilityBoundingSet=
+AmbientCapabilities=
+# Code + config are read-only at runtime: blocks persistence by overwriting the
+# binary/vendor or tampering with the config from within the agent's own context.
+ReadOnlyPaths=/opt/nicewatch-agent /etc/nicewatch
+# `df` and `php` live in /usr/bin — systemd doesn't set PATH by default.
+Environment=PATH=/usr/bin:/bin

@@ -12,9 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class CheckinProcessor
 {
-    public function __construct(private readonly AlertEvaluator $alerts)
-    {
-    }
+    public function __construct(private readonly AlertEvaluator $alerts) {}
 
     /**
      * @param  array<string, mixed>  $payload
@@ -27,6 +25,10 @@ class CheckinProcessor
                 'collected_at' => $collectedAt,
             ]);
 
+            // Capture the status before this checkin so we can detect a host
+            // coming back from offline and archive its open offline alerts.
+            $wasOffline = $host->status === Host::STATUS_OFFLINE;
+
             $reportedHostname = $payload['system']['hostname'] ?? null;
             $hostUpdates = [
                 'last_seen_at' => now(),
@@ -38,8 +40,15 @@ class CheckinProcessor
             }
 
             $host->fill($hostUpdates)->save();
+            $host->refresh();
 
-            $this->alerts->evaluateSnapshot($host->refresh(), $snapshot);
+            // Host is reporting again — move any open "host offline" alerts to
+            // the archive (resolved). Logged inside resolveOfflineAlerts().
+            if ($wasOffline) {
+                $this->alerts->resolveOfflineAlerts($host);
+            }
+
+            $this->alerts->evaluateSnapshot($host, $snapshot);
 
             return $snapshot;
         });

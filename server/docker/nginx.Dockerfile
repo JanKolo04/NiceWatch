@@ -23,10 +23,12 @@ FROM alpine:3 AS agent-zip
 RUN apk add --no-cache zip
 WORKDIR /build
 COPY agent/ ./nicewatch-agent/
-# Strip anything that shouldn't ship to monitored hosts.
+# Strip anything that shouldn't ship to monitored hosts, zip it, and emit a
+# SHA-256 so install.sh can verify integrity of the download before unpacking.
 RUN find nicewatch-agent -name '.DS_Store' -delete \
     && rm -rf nicewatch-agent/vendor nicewatch-agent/composer.lock nicewatch-agent/config.php \
-    && zip -rq nicewatch-agent.zip nicewatch-agent
+    && zip -rq nicewatch-agent.zip nicewatch-agent \
+    && sha256sum nicewatch-agent.zip | awk '{print $1}' > nicewatch-agent.zip.sha256
 
 # ----- Stage 3: nginx -----
 FROM nginx:1.27-alpine
@@ -37,8 +39,9 @@ COPY server/public/ /var/www/html/public/
 # Vite build output (CSS, JS, manifest.json) — overrides empty public/build
 COPY --from=assets /app/public/build /var/www/html/public/build
 
-# Agent ZIP + one-liner installer, served as plain static files
+# Agent ZIP (+ its SHA-256) + one-liner installer, served as plain static files
 COPY --from=agent-zip /build/nicewatch-agent.zip /var/www/html/public/downloads/nicewatch-agent.zip
+COPY --from=agent-zip /build/nicewatch-agent.zip.sha256 /var/www/html/public/downloads/nicewatch-agent.zip.sha256
 COPY agent/install.sh /var/www/html/public/install.sh
 
 # Server config

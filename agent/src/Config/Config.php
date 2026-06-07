@@ -17,10 +17,15 @@ final class Config
 
     public static function load(?string $path = null): self
     {
+        // Config files are `require`d (executed as PHP), so the search path must
+        // never include an attacker-controllable location. We deliberately do NOT
+        // look in the current working directory — otherwise running the agent from
+        // e.g. /tmp where someone dropped a config.php would execute their code.
+        // Order: explicit --config, env override, the install dir (read-only in
+        // production via systemd ReadOnlyPaths), then the canonical /etc path.
         $candidates = array_filter([
             $path,
             getenv('NICEWATCH_AGENT_CONFIG') ?: null,
-            getcwd() . '/config.php',
             __DIR__ . '/../../config.php',
             '/etc/nicewatch/agent.php',
         ]);

@@ -95,7 +95,7 @@ if ! id "$SERVICE_USER" >/dev/null 2>&1; then
     useradd -r -s /usr/sbin/nologin "$SERVICE_USER"
 fi
 
-# ---------- 3. Download & unpack ----------
+# ---------- 3. Download & verify & unpack ----------
 ZIP_URL="${SERVER%/}/downloads/nicewatch-agent.zip"
 TMP_ZIP=$(mktemp /tmp/nicewatch-agent.XXXX.zip)
 
@@ -103,6 +103,26 @@ log "Downloading $ZIP_URL"
 if ! curl -fsSL -o "$TMP_ZIP" "$ZIP_URL"; then
     echo "Failed to download $ZIP_URL — is the NiceWatch server reachable?" >&2
     exit 1
+fi
+
+# Integrity check: compare against the SHA-256 the server published next to the ZIP.
+# Catches corrupted transfers and version skew. (Note: when fetched over HTTPS this
+# also detects tampering in transit; it does NOT defend against a fully compromised
+# server — that trust is inherent to the curl|bash install model. Always use HTTPS.)
+EXPECTED_SHA=$(curl -fsSL "${ZIP_URL}.sha256" 2>/dev/null | tr -d '[:space:]' || true)
+if [[ -n "$EXPECTED_SHA" ]]; then
+    ACTUAL_SHA=$(sha256sum "$TMP_ZIP" | awk '{print $1}')
+    if [[ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]]; then
+        echo "Checksum mismatch for nicewatch-agent.zip!" >&2
+        echo "  expected: $EXPECTED_SHA" >&2
+        echo "  actual:   $ACTUAL_SHA" >&2
+        echo "Aborting — the download is corrupted or tampered with." >&2
+        rm -f "$TMP_ZIP"
+        exit 1
+    fi
+    log "Checksum OK ($ACTUAL_SHA)"
+else
+    echo "WARNING: server did not publish a .sha256 — skipping integrity check." >&2
 fi
 
 log "Extracting to $INSTALL_DIR"
@@ -116,11 +136,22 @@ if [[ ! -d "$SRC_DIR" ]]; then SRC_DIR=$(find "$TMP_EXTRACT" -mindepth 1 -maxdep
 cp -a "$SRC_DIR/." "$INSTALL_DIR/"
 rm -rf "$TMP_ZIP" "$TMP_EXTRACT"
 
-chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
+# unzip can drop the executable bit depending on how the archive was created —
+# restore it explicitly so `bin/nicewatch-agent` can be exec'd.
+chmod +x "$INSTALL_DIR/bin/nicewatch-agent"
 
 # ---------- 4. Composer deps ----------
+# Run composer as root (simpler + avoids "no writable HOME" / traverse issues for
+# the service user during install). We chown to the service user afterwards, so
+# the agent itself still runs unprivileged via systemd.
 log "Installing composer dependencies"
-sudo -u "$SERVICE_USER" -H bash -c "cd '$INSTALL_DIR' && composer install --no-dev --no-interaction --optimize-autoloader --quiet"
+export COMPOSER_ALLOW_SUPERUSER=1
+export COMPOSER_HOME=/tmp/nicewatch-composer
+( cd "$INSTALL_DIR" && composer install --no-dev --no-interaction --optimize-autoloader --quiet )
+
+# Now hand the whole tree to the unprivileged service user (runtime owner).
+chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
+rm -rf "$COMPOSER_HOME"
 
 # ---------- 5. Config ----------
 # Generate the PHP file via `php -r var_export(...)` so values are properly

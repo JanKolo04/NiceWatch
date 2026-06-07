@@ -116,3 +116,18 @@ Domyślnie agent czyta tylko:
 - wykonuje `df -P -B1 -T` (nie wymaga root)
 
 W kolejnych fazach (Docker, systemd, Postfix queue) będą wymagane dodatkowe uprawnienia — będą udokumentowane przy ich wprowadzeniu.
+
+## 7. Bezpieczeństwo
+
+Agent jest zaprojektowany tak, by jego obecność nie otwierała drogi do przejęcia hosta:
+
+- **Biegnie jako nieuprzywilejowany user `nicewatch`** (`-r -s /usr/sbin/nologin`), nigdy jako root w runtime. Tylko faza instalacji (`composer install`) wymaga roota.
+- **Odpowiedzi centrali są tylko danymi** — agent ich nie wykonuje (brak `eval`, `unserialize`, dynamicznego exec). Przejęta lub podszyta centrala **nie może** wykonać kodu na hoście przez normalny przepływ checkin/config. Lista kolektorów jest czysto lokalna (z `config.php`), nie sterowana z centrali.
+- **`df` wołane bezpieczną formą array** (bez shella), z argumentami-stałymi — brak command injection.
+- **systemd unit jest zahardeningowany** — `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, pusty `CapabilityBoundingSet`, `SystemCallFilter=@system-service`, `RestrictAddressFamilies=AF_INET AF_INET6`. Kod i config są `ReadOnlyPaths` — nawet po przejęciu usera `nicewatch` nie da się nadpisać binarki agenta (blokada persistence).
+- **ZIP agenta jest weryfikowany checksumem** — `install.sh` pobiera `nicewatch-agent.zip.sha256` obok ZIP-a i odrzuca instalację przy niezgodności (ochrona przed korupcją transferu i tamperingiem w tranzycie po HTTPS).
+- **Config ładowany tylko z zaufanych ścieżek** — `--config`, env, katalog instalacji (read-only w prod), `/etc/nicewatch/agent.php`. **Nie** z bieżącego katalogu (eliminacja podłożenia złośliwego `config.php`).
+
+**Wymóg produkcyjny:** używaj `server_url` z **`https://`** i `verify_tls => true`. To jedyna ochrona przed MITM — bez TLS atakujący w ścieżce sieciowej może przechwycić bearer token. `install.sh` ostrzega gdy podasz `http://`.
+
+Pełny model zagrożeń i reguły: [`../SECURITY.md`](../SECURITY.md).
