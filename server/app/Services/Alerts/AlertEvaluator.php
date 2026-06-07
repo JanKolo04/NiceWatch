@@ -12,13 +12,12 @@ use App\Models\Snapshot;
 use App\Services\Settings\SettingsRepository;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class AlertEvaluator
 {
-    public function __construct(private readonly SettingsRepository $settings)
-    {
-    }
+    public function __construct(private readonly SettingsRepository $settings) {}
 
     public function evaluateSnapshot(Host $host, Snapshot $snapshot): void
     {
@@ -56,13 +55,28 @@ class AlertEvaluator
         $this->dispatchMail($alert, new HostOfflineMail($host, $alert));
     }
 
-    public function resolveOfflineAlerts(Host $host): void
+    /**
+     * Archive (resolve) any open "host offline" alerts because the host is
+     * reporting again. Returns the number of alerts moved to the archive.
+     */
+    public function resolveOfflineAlerts(Host $host): int
     {
-        Alert::query()
+        $resolved = Alert::query()
             ->where('host_id', $host->id)
             ->where('type', Alert::TYPE_HOST_OFFLINE)
             ->whereNull('resolved_at')
             ->update(['resolved_at' => now()]);
+
+        if ($resolved > 0) {
+            Log::info('Host offline alert(s) auto-resolved: host is reporting again.', [
+                'host_id' => $host->id,
+                'host' => $host->name,
+                'resolved_count' => $resolved,
+                'last_seen_at' => optional($host->last_seen_at)?->toIso8601String(),
+            ]);
+        }
+
+        return $resolved;
     }
 
     private function evaluateDiskUsage(Host $host, Snapshot $snapshot): void
@@ -88,7 +102,7 @@ class AlertEvaluator
                 continue;
             }
 
-            $key = 'disk_high:' . $mount;
+            $key = 'disk_high:'.$mount;
 
             $recent = Alert::query()
                 ->where('host_id', $host->id)
