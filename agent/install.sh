@@ -95,7 +95,7 @@ if ! id "$SERVICE_USER" >/dev/null 2>&1; then
     useradd -r -s /usr/sbin/nologin "$SERVICE_USER"
 fi
 
-# ---------- 3. Download & unpack ----------
+# ---------- 3. Download & verify & unpack ----------
 ZIP_URL="${SERVER%/}/downloads/nicewatch-agent.zip"
 TMP_ZIP=$(mktemp /tmp/nicewatch-agent.XXXX.zip)
 
@@ -103,6 +103,26 @@ log "Downloading $ZIP_URL"
 if ! curl -fsSL -o "$TMP_ZIP" "$ZIP_URL"; then
     echo "Failed to download $ZIP_URL — is the NiceWatch server reachable?" >&2
     exit 1
+fi
+
+# Integrity check: compare against the SHA-256 the server published next to the ZIP.
+# Catches corrupted transfers and version skew. (Note: when fetched over HTTPS this
+# also detects tampering in transit; it does NOT defend against a fully compromised
+# server — that trust is inherent to the curl|bash install model. Always use HTTPS.)
+EXPECTED_SHA=$(curl -fsSL "${ZIP_URL}.sha256" 2>/dev/null | tr -d '[:space:]' || true)
+if [[ -n "$EXPECTED_SHA" ]]; then
+    ACTUAL_SHA=$(sha256sum "$TMP_ZIP" | awk '{print $1}')
+    if [[ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]]; then
+        echo "Checksum mismatch for nicewatch-agent.zip!" >&2
+        echo "  expected: $EXPECTED_SHA" >&2
+        echo "  actual:   $ACTUAL_SHA" >&2
+        echo "Aborting — the download is corrupted or tampered with." >&2
+        rm -f "$TMP_ZIP"
+        exit 1
+    fi
+    log "Checksum OK ($ACTUAL_SHA)"
+else
+    echo "WARNING: server did not publish a .sha256 — skipping integrity check." >&2
 fi
 
 log "Extracting to $INSTALL_DIR"

@@ -62,21 +62,26 @@
                 </div>
                 <div class="mt-2 text-3xl font-bold text-red-600 dark:text-red-400">{{ $stats['offline'] }}</div>
             </div>
-            <div class="nw-card p-5">
+            <a href="{{ route('alerts.index') }}" class="nw-card p-5 hover:shadow-md hover:border-amber-500/40 transition group">
                 <div class="flex items-center justify-between">
                     <div class="text-xs uppercase tracking-wide text-amber-600 dark:text-amber-400 font-medium">Open alerts</div>
                     <x-icon name="bell" class="w-5 h-5 text-amber-500" />
                 </div>
-                <div class="mt-2 text-3xl font-bold text-amber-600 dark:text-amber-400">{{ $stats['alerts'] }}</div>
-            </div>
+                <div class="mt-2 text-3xl font-bold text-amber-600 dark:text-amber-400 group-hover:text-amber-500">{{ $stats['alerts'] }}</div>
+            </a>
         </div>
 
         {{-- Open alerts --}}
         @if($openAlerts->isNotEmpty())
             <div class="nw-card overflow-hidden">
-                <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
-                    <x-icon name="bell" class="w-5 h-5 text-amber-500" />
-                    <h2 class="font-semibold text-slate-900 dark:text-slate-100">Open alerts ({{ $openAlerts->count() }})</h2>
+                <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <x-icon name="bell" class="w-5 h-5 text-amber-500" />
+                        <h2 class="font-semibold text-slate-900 dark:text-slate-100">Open alerts ({{ $openAlerts->count() }})</h2>
+                    </div>
+                    <a href="{{ route('alerts.index') }}" class="text-sm text-brand-500 hover:text-brand-400 inline-flex items-center gap-1">
+                        Zobacz wszystkie <x-icon name="arrow-right" class="w-4 h-4" />
+                    </a>
                 </div>
                 <ul class="divide-y divide-slate-100 dark:divide-slate-800">
                     @foreach($openAlerts as $alert)
