@@ -88,10 +88,10 @@ COPY --chown=www-data:www-data server/ /var/www/html
 COPY --from=vendor --chown=www-data:www-data /app/vendor /var/www/html/vendor
 COPY --from=assets --chown=www-data:www-data /app/public/build /var/www/html/public/build
 
-# Regenerate optimized autoloader now that the full app tree is present
-RUN composer dump-autoload --no-dev --optimize --classmap-authoritative
-
 # Storage + cache + sqlite directories must be writable.
+# Created BEFORE `composer dump-autoload` because that triggers
+# `artisan package:discover`, which fails if bootstrap/cache is missing
+# (git does not track the empty dir, so it is absent after `COPY server/`).
 # Note: /var/lib/nicewatch holds the SQLite database — it's an external mount
 # in compose (volume `app-data`) so app/database/migrations is NOT overlaid.
 RUN set -eux; \
@@ -106,6 +106,9 @@ RUN set -eux; \
     chown -R www-data:www-data storage bootstrap/cache /var/lib/nicewatch; \
     chmod -R 770 storage bootstrap/cache; \
     chmod 750 /var/lib/nicewatch
+
+# Regenerate optimized autoloader now that the full app tree is present
+RUN composer dump-autoload --no-dev --optimize --classmap-authoritative
 
 COPY server/docker/entrypoint.sh /usr/local/bin/nicewatch-entrypoint
 RUN chmod +x /usr/local/bin/nicewatch-entrypoint
